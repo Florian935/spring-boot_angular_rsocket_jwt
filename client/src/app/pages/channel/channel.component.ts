@@ -7,8 +7,14 @@ import {
 } from '@angular/core';
 import {
     APPLICATION_JSON,
+    BufferEncoders,
+    encodeBearerAuthMetadata,
+    encodeCompositeMetadata,
+    encodeRoute,
     IdentitySerializer,
     JsonSerializer,
+    MESSAGE_RSOCKET_AUTHENTICATION,
+    MESSAGE_RSOCKET_COMPOSITE_METADATA,
     MESSAGE_RSOCKET_ROUTING,
     RSocketClient,
 } from 'rsocket-core';
@@ -28,15 +34,16 @@ import { fromEvent } from 'rxjs';
 })
 export class ChannelComponent implements OnInit, OnDestroy {
     @ViewChild('channelButton', { static: true }) button?: ElementRef;
-    client!: RSocketClient<number, Encodable>;
+    jwt: string = 'GENERATED_JWT';
+    client!: RSocketClient<Buffer, Buffer>;
     numbersSquared: Array<number> = [];
-    flowable$ = new Flowable((subscriber) => {
+    flowable$ = new Flowable<number>((subscriber) => {
         subscriber.onSubscribe({
             cancel: () => {},
             request: () => {},
         });
     });
-    processor$ = new FlowableProcessor(this.flowable$);
+    processor$ = new FlowableProcessor<number, number>(this.flowable$);
 
     ngOnInit(): void {
         this.createRSocketClient();
@@ -48,41 +55,53 @@ export class ChannelComponent implements OnInit, OnDestroy {
 
     private createRSocketClient(): void {
         this.client = new RSocketClient({
-            serializers: {
-                data: JsonSerializer,
-                metadata: IdentitySerializer,
-            },
             setup: {
                 keepAlive: 60000,
                 lifetime: 180000,
                 dataMimeType: APPLICATION_JSON.string,
-                metadataMimeType: MESSAGE_RSOCKET_ROUTING.string,
+                metadataMimeType: MESSAGE_RSOCKET_COMPOSITE_METADATA.string,
             },
-            transport: new RSocketWebSocketClient({
-                debug: true,
-                url: 'ws://localhost:7000',
-                wsCreator: (url) => new WebSocket(url),
-            }),
+            transport: new RSocketWebSocketClient(
+                {
+                    debug: true,
+                    url: 'ws://localhost:7000/rsocket',
+                    wsCreator: (url) => new WebSocket(url),
+                },
+                BufferEncoders
+            ),
         });
     }
 
     private connect(): void {
         this.client.connect().subscribe({
-            onComplete: (socket: ReactiveSocket<number, Encodable>) => {
+            onComplete: (socket: ReactiveSocket<Buffer, Buffer>) => {
                 socket
                     .requestChannel(
-                        this.processor$.map((i) => {
+                        this.processor$.map((numberToSquare: number) => {
                             return {
-                                data: i,
-                                metadata: this.getMetadata('channel'),
+                                data: Buffer.from(numberToSquare.toString()),
+                                metadata: encodeCompositeMetadata([
+                                    [
+                                        MESSAGE_RSOCKET_ROUTING,
+                                        encodeRoute('product.channel'),
+                                    ],
+                                    [
+                                        MESSAGE_RSOCKET_AUTHENTICATION,
+                                        encodeBearerAuthMetadata(this.jwt),
+                                    ],
+                                ]),
                             };
-                        }) as Flowable<Payload<number, Encodable>>
+                        }) as Flowable<Payload<Buffer, Buffer>>
                     )
                     .subscribe({
-                        onNext: ({ data }) => {
+                        onNext: (payload: Payload<Buffer, Buffer>) => {
+                            const numberSquaredReceived: number =
+                                this.parseObject<number>(
+                                    payload.data!.toString()
+                                );
                             this.numbersSquared = [
                                 ...this.numbersSquared,
-                                data as number,
+                                numberSquaredReceived,
                             ];
                         },
                         onComplete: () => {
@@ -107,8 +126,8 @@ export class ChannelComponent implements OnInit, OnDestroy {
         });
     }
 
-    private getMetadata(route: string): string {
-        return `${String.fromCharCode(route.length)}${route}`;
+    private parseObject<T>(stringToObject: string): T {
+        return JSON.parse(stringToObject);
     }
 
     ngOnDestroy(): void {
