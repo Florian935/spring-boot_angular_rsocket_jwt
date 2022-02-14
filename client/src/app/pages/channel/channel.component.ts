@@ -11,20 +11,13 @@ import {
     encodeBearerAuthMetadata,
     encodeCompositeMetadata,
     encodeRoute,
-    IdentitySerializer,
-    JsonSerializer,
     MESSAGE_RSOCKET_AUTHENTICATION,
     MESSAGE_RSOCKET_COMPOSITE_METADATA,
     MESSAGE_RSOCKET_ROUTING,
     RSocketClient,
 } from 'rsocket-core';
 import { Flowable, FlowableProcessor } from 'rsocket-flowable';
-import {
-    Encodable,
-    ISubscription,
-    Payload,
-    ReactiveSocket,
-} from 'rsocket-types';
+import { ISubscription, Payload, ReactiveSocket } from 'rsocket-types';
 import RSocketWebSocketClient from 'rsocket-websocket-client';
 import { fromEvent } from 'rxjs';
 @Component({
