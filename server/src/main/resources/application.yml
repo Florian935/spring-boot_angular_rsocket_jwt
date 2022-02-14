@@ -1,8 +1,12 @@
 spring:
   rsocket:
     server:
-      port: 7000
-      transport: WEBSOCKET
+      port: 7000 # If port not set, we can connect to rsocket from: http://localhost:8080/rsocket
+      #else if the port is defined, we can connect to rsocket from: http://localhost:7000/rsocket
+      # In cloud deployment, we need to specify the mapping-path because we can't access an URI via port (cause there is
+      # a load balancing between public and private FQDN
+      transport: websocket
+      mapping-path: /rsocket
 
 server:
   port: 8080

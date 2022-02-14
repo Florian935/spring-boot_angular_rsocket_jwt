@@ -1,15 +1,17 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
     APPLICATION_JSON,
-    Encodable,
-    IdentitySerializer,
-    JsonSerializer,
+    BufferEncoders,
+    encodeBearerAuthMetadata,
+    encodeCompositeMetadata,
+    encodeRoute,
+    MESSAGE_RSOCKET_AUTHENTICATION,
+    MESSAGE_RSOCKET_COMPOSITE_METADATA,
     MESSAGE_RSOCKET_ROUTING,
     RSocketClient,
 } from 'rsocket-core';
-import RSocketWebSocketClient from 'rsocket-websocket-client';
-import { Product } from 'src/app/shared/product.model';
 import { ReactiveSocket } from 'rsocket-types';
+import RSocketWebSocketClient from 'rsocket-websocket-client';
 
 @Component({
     selector: 'app-fire-and-forget',
@@ -17,7 +19,8 @@ import { ReactiveSocket } from 'rsocket-types';
     styleUrls: ['./fire-and-forget.component.scss'],
 })
 export class FireAndForgetComponent implements OnInit, OnDestroy {
-    client!: RSocketClient<string, Encodable>;
+    jwt: string = 'GENERATED_JWT';
+    client!: RSocketClient<Buffer, Buffer>;
 
     ngOnInit(): void {
         this.createRSocketClient();
@@ -25,31 +28,39 @@ export class FireAndForgetComponent implements OnInit, OnDestroy {
     }
 
     private createRSocketClient(): void {
-        this.client = new RSocketClient<string, Encodable>({
-            serializers: {
-                data: JsonSerializer,
-                metadata: IdentitySerializer,
-            },
+        this.client = new RSocketClient<Buffer, Buffer>({
             setup: {
                 keepAlive: 60000,
                 lifetime: 180000,
                 dataMimeType: APPLICATION_JSON.string,
-                metadataMimeType: MESSAGE_RSOCKET_ROUTING.string,
+                metadataMimeType: MESSAGE_RSOCKET_COMPOSITE_METADATA.string,
             },
-            transport: new RSocketWebSocketClient({
-                debug: true,
-                url: 'ws://localhost:7000',
-                wsCreator: (url) => new WebSocket(url),
-            }),
+            transport: new RSocketWebSocketClient(
+                {
+                    debug: true,
+                    url: 'ws://localhost:7000/rsocket',
+                    wsCreator: (url) => new WebSocket(url),
+                },
+                BufferEncoders
+            ),
         });
     }
 
     private connect(): void {
         this.client.connect().subscribe({
-            onComplete: (socket: ReactiveSocket<string, Encodable>) => {
+            onComplete: (socket: ReactiveSocket<Buffer, Buffer>) => {
                 socket.fireAndForget({
-                    data: 'Hello World !',
-                    metadata: this.getMetadata('fire.and.forget'),
+                    data: Buffer.from('Hello World !'),
+                    metadata: encodeCompositeMetadata([
+                        [
+                            MESSAGE_RSOCKET_ROUTING,
+                            encodeRoute('product.fire.and.forget'),
+                        ],
+                        [
+                            MESSAGE_RSOCKET_AUTHENTICATION,
+                            encodeBearerAuthMetadata(this.jwt),
+                        ],
+                    ]),
                 });
             },
             onError: (error) => {
@@ -59,10 +70,6 @@ export class FireAndForgetComponent implements OnInit, OnDestroy {
                 console.log('Subcribed successfully !');
             },
         });
-    }
-
-    private getMetadata(route: string): string {
-        return `${String.fromCharCode(route.length)}${route}`;
     }
 
     ngOnDestroy(): void {

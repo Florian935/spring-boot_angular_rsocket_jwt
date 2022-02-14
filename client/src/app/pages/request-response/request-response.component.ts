@@ -2,7 +2,6 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
     APPLICATION_JSON,
     BufferEncoders,
-    Encodable,
     encodeBearerAuthMetadata,
     encodeCompositeMetadata,
     encodeRoute,
@@ -21,7 +20,7 @@ import { Product } from 'src/app/shared/product.model';
     styleUrls: ['./request-response.component.scss'],
 })
 export class RequestResponseComponent implements OnInit, OnDestroy {
-    jwt: string = 'JWT_GENERATED_BY_SERVER';
+    jwt: string = 'GENERATED_JWT';
     client!: RSocketClient<Buffer, Buffer>;
     product?: Product;
 
@@ -41,7 +40,7 @@ export class RequestResponseComponent implements OnInit, OnDestroy {
             transport: new RSocketWebSocketClient(
                 {
                     debug: true,
-                    url: 'ws://localhost:7000',
+                    url: 'ws://localhost:7000/rsocket',
                     wsCreator: (url) => new WebSocket(url),
                 },
                 BufferEncoders
@@ -55,12 +54,12 @@ export class RequestResponseComponent implements OnInit, OnDestroy {
                 socket
                     .requestResponse({
                         data: Buffer.from(
-                            JSON.stringify({ label: 'Computer', price: 999 })
+                            JSON.stringify({ label: 'Computer', price: 998 })
                         ),
                         metadata: encodeCompositeMetadata([
                             [
                                 MESSAGE_RSOCKET_ROUTING,
-                                encodeRoute('request.response.1'),
+                                encodeRoute('product.request.response.1'),
                             ],
                             [
                                 MESSAGE_RSOCKET_AUTHENTICATION,
