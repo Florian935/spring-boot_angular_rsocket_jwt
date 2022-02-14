@@ -69,7 +69,7 @@ export class RequestResponseComponent implements OnInit, OnDestroy {
                     })
                     .subscribe({
                         onComplete: (payload: Payload<Buffer, Buffer>) => {
-                            this.product = this.parseObject(
+                            this.product = this.parseObject<Product>(
                                 payload.data!.toString()
                             );
                         },
