@@ -17,7 +17,12 @@ import {
     RSocketClient,
 } from 'rsocket-core';
 import { Flowable, FlowableProcessor } from 'rsocket-flowable';
-import { ISubscription, Payload, ReactiveSocket } from 'rsocket-types';
+import {
+    ISubscriber,
+    ISubscription,
+    Payload,
+    ReactiveSocket,
+} from 'rsocket-types';
 import RSocketWebSocketClient from 'rsocket-websocket-client';
 import { fromEvent } from 'rxjs';
 @Component({
@@ -30,7 +35,7 @@ export class ChannelComponent implements OnInit, OnDestroy {
     jwt: string = 'GENERATED_JWT';
     client!: RSocketClient<Buffer, Buffer>;
     numbersSquared: Array<number> = [];
-    flowable$ = new Flowable<number>((subscriber) => {
+    flowable$ = new Flowable<number>((subscriber: ISubscriber<number>) => {
         subscriber.onSubscribe({
             cancel: () => {},
             request: () => {},
@@ -70,21 +75,9 @@ export class ChannelComponent implements OnInit, OnDestroy {
             onComplete: (socket: ReactiveSocket<Buffer, Buffer>) => {
                 socket
                     .requestChannel(
-                        this.processor$.map((numberToSquare: number) => {
-                            return {
-                                data: Buffer.from(numberToSquare.toString()),
-                                metadata: encodeCompositeMetadata([
-                                    [
-                                        MESSAGE_RSOCKET_ROUTING,
-                                        encodeRoute('product.channel'),
-                                    ],
-                                    [
-                                        MESSAGE_RSOCKET_AUTHENTICATION,
-                                        encodeBearerAuthMetadata(this.jwt),
-                                    ],
-                                ]),
-                            };
-                        }) as Flowable<Payload<Buffer, Buffer>>
+                        this.processor$.map((numberToSquare: number) =>
+                            this.buildPayload(numberToSquare)
+                        ) as Flowable<Payload<Buffer, Buffer>>
                     )
                     .subscribe({
                         onNext: (payload: Payload<Buffer, Buffer>) => {
@@ -117,6 +110,21 @@ export class ChannelComponent implements OnInit, OnDestroy {
                 console.log('Subcribed successfully !');
             },
         });
+    }
+
+    private buildPayload(numberToSquare: number): Payload<Buffer, Buffer> {
+        const payload: Payload<Buffer, Buffer> = {
+            data: Buffer.from(numberToSquare.toString()),
+            metadata: encodeCompositeMetadata([
+                [MESSAGE_RSOCKET_ROUTING, encodeRoute('product.channel')],
+                [
+                    MESSAGE_RSOCKET_AUTHENTICATION,
+                    encodeBearerAuthMetadata(this.jwt),
+                ],
+            ]),
+        };
+
+        return payload;
     }
 
     private parseObject<T>(stringToObject: string): T {
